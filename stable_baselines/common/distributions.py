@@ -1,7 +1,7 @@
 import numpy as np
 import tensorflow as tf
-from tensorflow.python.ops import math_ops
 from gym import spaces
+from tensorflow.python.ops import math_ops
 
 from stable_baselines.utils import linear
 

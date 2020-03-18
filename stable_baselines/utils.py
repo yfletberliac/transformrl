@@ -1,7 +1,7 @@
 import gym
-from gym.wrappers import TimeLimit
 import numpy as np
 import tensorflow as tf
+from gym.wrappers import TimeLimit
 
 
 def ortho_init(scale=1.0):

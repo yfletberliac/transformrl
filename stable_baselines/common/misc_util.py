@@ -1,11 +1,12 @@
 import random
 from collections import deque
 
+import cv2  # pytype:disable=import-error
 import gym
-from gym import spaces
 import numpy as np
 import tensorflow as tf
-import cv2  # pytype:disable=import-error
+from gym import spaces
+
 cv2.ocl.setUseOpenCL(False)
 
 

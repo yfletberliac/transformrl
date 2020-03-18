@@ -1,17 +1,17 @@
-import os
-import sys
-import shutil
-import json
-import time
 import datetime
+import json
+import os
+import shutil
+import sys
 import tempfile
+import time
 import warnings
 from collections import defaultdict
 from typing import Optional
 
 import tensorflow as tf
-from tensorflow.python import pywrap_tensorflow
 from tensorflow.core.util import event_pb2
+from tensorflow.python import pywrap_tensorflow
 from tensorflow.python.util import compat
 
 from stable_baselines.common.misc_util import mpi_rank_or_zero

@@ -1,7 +1,7 @@
-import os
 import collections
 import functools
 import multiprocessing
+import os
 from typing import Set
 
 import numpy as np

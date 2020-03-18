@@ -1,21 +1,21 @@
-from abc import ABC, abstractmethod
-import os
 import glob
-import warnings
-from collections import OrderedDict
 import json
+import os
+import warnings
 import zipfile
+from abc import ABC, abstractmethod
+from collections import OrderedDict
 
 import cloudpickle
-import numpy as np
 import gym
+import numpy as np
 import tensorflow as tf
 
-from stable_baselines.common.misc_util import set_global_seeds
-from stable_baselines.common.save_util import data_to_json, json_to_data, params_to_bytes, bytes_to_params
-from stable_baselines.common.policies import get_policy_from_name, ActorCriticPolicy
-from stable_baselines.common.vec_env import VecEnvWrapper, VecEnv, DummyVecEnv
 from stable_baselines import logger
+from stable_baselines.common.misc_util import set_global_seeds
+from stable_baselines.common.policies import get_policy_from_name, ActorCriticPolicy
+from stable_baselines.common.save_util import data_to_json, json_to_data, params_to_bytes, bytes_to_params
+from stable_baselines.common.vec_env import VecEnvWrapper, VecEnv, DummyVecEnv
 
 
 class BaseRLModel(ABC):

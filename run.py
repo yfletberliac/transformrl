@@ -1,8 +1,6 @@
 import os
 
 from stable_baselines import PPO2
-from stable_baselines.trpo_mpi import TRPO
-from stable_baselines.sac import SAC
 from stable_baselines.common import make_vec_env
 
 for env_id in ["AntBulletEnv-v0"]:

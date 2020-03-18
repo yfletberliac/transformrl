@@ -1,15 +1,15 @@
 import warnings
-from itertools import zip_longest
 from abc import ABC, abstractmethod
+from itertools import zip_longest
 
 import numpy as np
 import tensorflow as tf
 from gym.spaces import Discrete
 
-from stable_baselines.utils import conv, linear, conv_to_fc, batch_to_seq, seq_to_batch, lstm
 from stable_baselines.common.distributions import make_proba_dist_type, CategoricalProbabilityDistribution, \
     MultiCategoricalProbabilityDistribution, DiagGaussianProbabilityDistribution, BernoulliProbabilityDistribution
 from stable_baselines.common.input import observation_input
+from stable_baselines.utils import conv, linear, conv_to_fc, batch_to_seq, seq_to_batch, lstm
 
 
 def nature_cnn(scaled_images, **kwargs):

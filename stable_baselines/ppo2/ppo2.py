@@ -2,15 +2,14 @@ import time
 from collections import deque
 
 import gym
-import pybullet_envs
 import numpy as np
 import tensorflow as tf
 
 from stable_baselines import logger
 from stable_baselines.common import explained_variance_tensor, variance_tensor, explained_variance, ActorCriticRLModel, \
     tf_util, SetVerbosity, TensorboardWriter
-from stable_baselines.common.runners import AbstractEnvRunner
 from stable_baselines.common.policies import ActorCriticPolicy, RecurrentActorCriticPolicy
+from stable_baselines.common.runners import AbstractEnvRunner
 from stable_baselines.utils import total_episode_reward_logger
 
 

@@ -6,14 +6,13 @@ import os
 import warnings
 
 import gym
-import pybullet_envs
 
 from stable_baselines import logger
-from stable_baselines.monitor import Monitor
-from stable_baselines.common.misc_util import set_global_seeds
 from stable_baselines.common.misc_util import make_atari, wrap_deepmind
 from stable_baselines.common.misc_util import mpi_rank_or_zero
+from stable_baselines.common.misc_util import set_global_seeds
 from stable_baselines.common.vec_env import DummyVecEnv, SubprocVecEnv
+from stable_baselines.monitor import Monitor
 
 
 def make_vec_env(env_id, n_envs=1, seed=None, start_index=0,

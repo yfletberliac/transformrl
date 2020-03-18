@@ -1,5 +1,5 @@
-from typing import Union
 from copy import deepcopy
+from typing import Union
 
 import gym
 
@@ -8,10 +8,10 @@ from stable_baselines.common.vec_env.base_vec_env import AlreadySteppingError, N
     CloudpickleWrapper
 from stable_baselines.common.vec_env.dummy_vec_env import DummyVecEnv
 from stable_baselines.common.vec_env.subproc_vec_env import SubprocVecEnv
+from stable_baselines.common.vec_env.vec_check_nan import VecCheckNan
 from stable_baselines.common.vec_env.vec_frame_stack import VecFrameStack
 from stable_baselines.common.vec_env.vec_normalize import VecNormalize
 from stable_baselines.common.vec_env.vec_video_recorder import VecVideoRecorder
-from stable_baselines.common.vec_env.vec_check_nan import VecCheckNan
 
 
 def unwrap_vec_normalize(env: Union[gym.Env, VecEnv]) -> Union[VecNormalize, None]:
