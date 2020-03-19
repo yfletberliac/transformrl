@@ -10,6 +10,8 @@ from stable_baselines.common.distributions import make_proba_dist_type, Categori
     MultiCategoricalProbabilityDistribution, DiagGaussianProbabilityDistribution, BernoulliProbabilityDistribution
 from stable_baselines.common.input import observation_input
 from stable_baselines.utils import conv, linear, conv_to_fc, batch_to_seq, seq_to_batch, lstm
+from keras_transformer.transformer import *
+from keras_transformer.position import *
 
 
 def nature_cnn(scaled_images, **kwargs):
@@ -86,6 +88,27 @@ def mlp_extractor(flat_observations, net_arch, act_fun):
             latent_value = act_fun(linear(latent_value, "vf_fc{}".format(idx), vf_layer_size, init_scale=np.sqrt(2)))
 
     return latent_policy, latent_value
+
+
+def transformer(flat_observations, transformer_depth):
+
+    transformer_block = TransformerBlock(
+        name='transformer',
+        num_heads=8,
+        residual_dropout=0.1,
+        attention_dropout=0.1,
+        use_masking=True)
+
+    add_coordinate_embedding = TransformerCoordinateEmbedding(
+        transformer_depth,
+        name='coordinate_embedding')
+
+    output = flat_observations  # shape: (<batch size>, <sequence length>, <input size>)
+    for step in range(transformer_depth):
+        output = transformer_block(
+            add_coordinate_embedding(output, step=step))
+
+    return output
 
 
 class BasePolicy(ABC):
@@ -558,9 +581,12 @@ class FeedForwardPolicy(ActorCriticPolicy):
                 pi_latent = vf_latent = cnn_extractor(self.processed_obs, **kwargs)
             else:
                 pi_latent, vf_latent = mlp_extractor(tf.layers.flatten(self.processed_obs), net_arch, act_fun)
+                transformer_latent = transformer(linear(self.processed_obs, 'pre-trans', ob_space), transformer_depth=2)
 
             self._value_fn = linear(vf_latent, 'vf', 1)
-
+            self.transformer_out = linear(transformer_latent, 'post-trans', ob_space)
+            # TODO: loss function and masking
+            
             self._proba_distribution, self._policy, self.q_value = \
                 self.pdtype.proba_distribution_from_latent(pi_latent, vf_latent, init_scale=0.01)
 

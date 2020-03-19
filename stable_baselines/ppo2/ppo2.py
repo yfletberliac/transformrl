@@ -193,8 +193,8 @@ class PPO2(ActorCriticRLModel):
                     self.clipfrac = tf.reduce_mean(tf.cast(tf.greater(tf.abs(ratio - 1.0),
                                                                       self.clip_range_ph), tf.float32))
 
-                    loss = self.pg_loss + self.avec_coef * (
-                                1 - self.explained_variance) * self.variance + self.vf_loss * self.vf_coef
+                    # loss = self.pg_loss + self.vf_loss * self.vf_coef
+                    loss = self.pg_loss + self.vf_loss * self.vf_coef + self.transformer_loss * self.transformer_coef
 
                     tf.summary.scalar('entropy_loss', self.entropy)
                     tf.summary.scalar('policy_gradient_loss', self.pg_loss)
