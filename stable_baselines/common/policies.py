@@ -103,7 +103,7 @@ def transformer(flat_observations, transformer_depth):
         transformer_depth,
         name='coordinate_embedding')
 
-    output = flat_observations  # shape: (<batch size>, <sequence length>, <input size>)
+    output = flat_observations  # shape: (<batch size>, <input size>)
     for step in range(transformer_depth):
         output = transformer_block(
             add_coordinate_embedding(output, step=step))
@@ -246,6 +246,7 @@ class ActorCriticPolicy(BasePolicy):
         self._policy = None
         self._proba_distribution = None
         self._value_fn = None
+        self._pre_transformer_latent = None
         self._action = None
         self._deterministic_action = None
 
@@ -268,6 +269,7 @@ class ActorCriticPolicy(BasePolicy):
             else:
                 self._policy_proba = []  # it will return nothing, as it is not implemented
             self._value_flat = self.value_fn[:, 0]
+            self._pre_transformer_latent_flat = self.pre_transformer_latent[:]
 
     @property
     def pdtype(self):
@@ -290,9 +292,19 @@ class ActorCriticPolicy(BasePolicy):
         return self._value_fn
 
     @property
+    def pre_transformer_latent(self):
+        """tf.Tensor: transformer estimate, of shape (self.n_batch, 1, ob_space)"""
+        return self._pre_transformer_latent
+
+    @property
     def value_flat(self):
         """tf.Tensor: value estimate, of shape (self.n_batch, )"""
         return self._value_flat
+
+    @property
+    def pre_transformer_latent_flat(self):
+        """tf.Tensor: value estimate, of shape (self.n_batch, ob_space)"""
+        return self._pre_transformer_latent_flat
 
     @property
     def action(self):
@@ -516,7 +528,6 @@ class LstmPolicy(RecurrentActorCriticPolicy):
                     raise ValueError("The net_arch parameter must contain at least one occurrence of 'lstm'!")
 
                 self._value_fn = linear(latent_value, 'vf', 1)
-                # TODO: why not init_scale = 0.001 here like in the feedforward
                 self._proba_distribution, self._policy, self.q_value = \
                     self.pdtype.proba_distribution_from_latent(latent_policy, latent_value)
         self._setup_init()
@@ -580,13 +591,13 @@ class FeedForwardPolicy(ActorCriticPolicy):
             if feature_extraction == "cnn":
                 pi_latent = vf_latent = cnn_extractor(self.processed_obs, **kwargs)
             else:
-                pi_latent, vf_latent = mlp_extractor(tf.layers.flatten(self.processed_obs), net_arch, act_fun)
-                transformer_latent = transformer(linear(self.processed_obs, 'pre-trans', ob_space), transformer_depth=2)
+                # TODO tune output size (n_hidden)
+                pre_transformer_latent = linear(self.processed_obs, 'pre-trans', n_hidden=32)
+                pi_latent, vf_latent = mlp_extractor(tf.layers.flatten(pre_transformer_latent), net_arch, act_fun)
 
             self._value_fn = linear(vf_latent, 'vf', 1)
-            self.transformer_out = linear(transformer_latent, 'post-trans', ob_space)
-            # TODO: loss function and masking
-            
+            self._pre_transformer_latent = pre_transformer_latent
+
             self._proba_distribution, self._policy, self.q_value = \
                 self.pdtype.proba_distribution_from_latent(pi_latent, vf_latent, init_scale=0.01)
 

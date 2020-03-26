@@ -118,6 +118,8 @@ class TransformerTransition(Layer):
 
     def call(self, inputs, **kwargs):
         input_shape = K.int_shape(inputs)
+        # TODO remove this other quick-fix ↓
+        input_shape = (int(2048/32), input_shape[-1])
         d_model = input_shape[-1]
         step1 = self.activation(
             K.bias_add(

@@ -2,6 +2,7 @@ import time
 from collections import deque
 
 import gym
+import pybullet_envs
 import numpy as np
 import tensorflow as tf
 
@@ -10,7 +11,10 @@ from stable_baselines.common import explained_variance_tensor, variance_tensor, 
     tf_util, SetVerbosity, TensorboardWriter
 from stable_baselines.common.policies import ActorCriticPolicy, RecurrentActorCriticPolicy
 from stable_baselines.common.runners import AbstractEnvRunner
-from stable_baselines.utils import total_episode_reward_logger
+from stable_baselines.utils import total_episode_reward_logger, linear
+from stable_baselines.common.tf_util import huber_loss
+from keras_transformer.transformer import *
+from keras_transformer.position import *
 
 
 class PPO2(ActorCriticRLModel):
@@ -53,7 +57,7 @@ class PPO2(ActorCriticRLModel):
 
     def __init__(self, policy, env, gamma=0.99, n_steps=2048, ent_coef=0.0, learning_rate=2.5e-4, vf_coef=0.5,
                  max_grad_norm=0.5, lam=0.95, nminibatches=32, noptepochs=10, cliprange=0.2, cliprange_vf=None,
-                 verbose=0, tensorboard_log=None, _init_setup_model=True, policy_kwargs=None, avec_coef=1.0,
+                 verbose=0, tensorboard_log=None, _init_setup_model=True, policy_kwargs=None, transformer_coef=1.0,
                  full_tensorboard_log=False, seed=None, n_cpu_tf_sess=None):
 
         super(PPO2, self).__init__(policy=policy, env=env, verbose=verbose, requires_vec_env=True,
@@ -66,7 +70,7 @@ class PPO2(ActorCriticRLModel):
         self.n_steps = n_steps
         self.ent_coef = ent_coef
         self.vf_coef = vf_coef
-        self.avec_coef = avec_coef
+        self.transformer_coef = transformer_coef
         self.max_grad_norm = max_grad_norm
         self.gamma = gamma
         self.lam = lam
@@ -85,6 +89,7 @@ class PPO2(ActorCriticRLModel):
         self.learning_rate_ph = None
         self.clip_range_ph = None
         self.entropy = None
+        self.transformer_loss = None
         self.vf_loss = None
         self.pg_loss = None
         self.approxkl = None
@@ -153,6 +158,7 @@ class PPO2(ActorCriticRLModel):
                     self.entropy = tf.reduce_mean(train_model.proba_distribution.entropy())
 
                     vpred = train_model.value_flat
+                    obspred = train_model.pre_transformer_latent_flat
 
                     # Value function clipping: not present in the original PPO
                     if self.cliprange_vf is None:
@@ -183,7 +189,6 @@ class PPO2(ActorCriticRLModel):
                     self.vf_loss = .5 * tf.reduce_mean(tf.maximum(vf_losses1, vf_losses2))
 
                     self.explained_variance = explained_variance_tensor(vpred, self.rewards_ph)
-                    self.variance = variance_tensor(self.rewards_ph)
                     ratio = tf.exp(self.old_neglog_pac_ph - neglogpac)
                     pg_losses = -self.advs_ph * ratio
                     pg_losses2 = -self.advs_ph * tf.clip_by_value(ratio, 1.0 - self.clip_range_ph, 1.0 +
@@ -193,12 +198,16 @@ class PPO2(ActorCriticRLModel):
                     self.clipfrac = tf.reduce_mean(tf.cast(tf.greater(tf.abs(ratio - 1.0),
                                                                       self.clip_range_ph), tf.float32))
 
-                    # loss = self.pg_loss + self.vf_loss * self.vf_coef
+                    obspred = linear(tf.squeeze(transformer(obspred, transformer_depth=2)),
+                                     'post-trans', self.observation_space.shape[0])
+                    self.transformer_loss = tf.reduce_mean(huber_loss(obspred - train_model.obs_ph))
+
                     loss = self.pg_loss + self.vf_loss * self.vf_coef + self.transformer_loss * self.transformer_coef
 
                     tf.summary.scalar('entropy_loss', self.entropy)
                     tf.summary.scalar('policy_gradient_loss', self.pg_loss)
                     tf.summary.scalar('value_function_loss', self.vf_loss)
+                    tf.summary.scalar('transformer_loss', self.transformer_loss)
                     tf.summary.scalar('approximate_kullback-leibler', self.approxkl)
                     tf.summary.scalar('ratio', tf.reduce_mean(ratio))
                     tf.summary.scalar('logratio', tf.log(tf.reduce_mean(ratio)))
@@ -290,7 +299,6 @@ class PPO2(ActorCriticRLModel):
             update_fac = self.n_batch // self.nminibatches // self.noptepochs + 1
         else:
             update_fac = self.n_batch // self.nminibatches // self.noptepochs // self.n_steps + 1
-
         if writer is not None and (1 + update) % 10 == 0:
             # run loss backprop with summary, but once every 10 runs save the metadata (memory, compute time, ...)
             if self.full_tensorboard_log and (1 + update) % 10 == 0:
@@ -319,7 +327,6 @@ class PPO2(ActorCriticRLModel):
         cliprange_vf = get_schedule_fn(self.cliprange_vf)
 
         new_tb_log = self._init_num_timesteps(reset_num_timesteps)
-
         with SetVerbosity(self.verbose), TensorboardWriter(self.graph, self.tensorboard_log, tb_log_name, new_tb_log) \
                 as writer:
             self._setup_learn()
@@ -571,3 +578,24 @@ def safe_mean(arr):
     :return: (float)
     """
     return np.nan if len(arr) == 0 else np.mean(arr)
+
+
+def transformer(flat_observations, transformer_depth):
+
+    transformer_block = TransformerBlock(
+        name='transformer',
+        num_heads=8,
+        residual_dropout=0.1,
+        attention_dropout=0.1,
+        use_masking=True)
+
+    add_coordinate_embedding = TransformerCoordinateEmbedding(
+        transformer_depth,
+        name='coordinate_embedding')
+
+    output = flat_observations  # shape: (<batch size>, <input size>)
+    for step in range(transformer_depth):
+        output = transformer_block(
+            add_coordinate_embedding(output, step=step))
+
+    return output

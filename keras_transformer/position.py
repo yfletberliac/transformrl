@@ -106,6 +106,8 @@ class TransformerCoordinateEmbedding(Layer):
     # noinspection PyAttributeOutsideInit
     def build(self, input_shape):
         sequence_length, d_model = input_shape[-2:]
+        # TODO remove this quick-fix ↓
+        sequence_length = int(2048 / 32)  # nsteps / nminibatches
         self.word_position_embeddings = self.add_weight(
             shape=(sequence_length, d_model),
             initializer='uniform',
