@@ -91,7 +91,6 @@ def mlp_extractor(flat_observations, net_arch, act_fun):
 
 
 def transformer(flat_observations, transformer_depth):
-
     transformer_block = TransformerBlock(
         name='transformer',
         num_heads=8,
@@ -265,7 +264,7 @@ class ActorCriticPolicy(BasePolicy):
                 self._policy_proba = tf.nn.sigmoid(self.policy)
             elif isinstance(self.proba_distribution, MultiCategoricalProbabilityDistribution):
                 self._policy_proba = [tf.nn.softmax(categorical.flatparam())
-                                     for categorical in self.proba_distribution.categoricals]
+                                      for categorical in self.proba_distribution.categoricals]
             else:
                 self._policy_proba = []  # it will return nothing, as it is not implemented
             self._value_flat = self.value_fn[:, 0]
@@ -377,11 +376,11 @@ class RecurrentActorCriticPolicy(ActorCriticPolicy):
                                                          n_batch, reuse=reuse, scale=scale)
 
         with tf.variable_scope("input", reuse=False):
-            self._dones_ph = tf.placeholder(tf.float32, (n_batch, ), name="dones_ph")  # (done t-1)
-            state_ph_shape = (self.n_env, ) + tuple(state_shape)
+            self._dones_ph = tf.placeholder(tf.float32, (n_batch,), name="dones_ph")  # (done t-1)
+            state_ph_shape = (self.n_env,) + tuple(state_shape)
             self._states_ph = tf.placeholder(tf.float32, state_ph_shape, name="states_ph")
 
-        initial_state_shape = (self.n_env, ) + tuple(state_shape)
+        initial_state_shape = (self.n_env,) + tuple(state_shape)
         self._initial_state = np.zeros(initial_state_shape, dtype=np.float32)
 
     @property
@@ -436,7 +435,7 @@ class LstmPolicy(RecurrentActorCriticPolicy):
                  **kwargs):
         # state_shape = [n_lstm * 2] dim because of the cell and hidden states of the LSTM
         super(LstmPolicy, self).__init__(sess, ob_space, ac_space, n_env, n_steps, n_batch,
-                                         state_shape=(2 * n_lstm, ), reuse=reuse,
+                                         state_shape=(2 * n_lstm,), reuse=reuse,
                                          scale=(feature_extraction == "cnn"))
 
         self._kwargs_check(feature_extraction, kwargs)
@@ -592,8 +591,11 @@ class FeedForwardPolicy(ActorCriticPolicy):
                 pi_latent = vf_latent = cnn_extractor(self.processed_obs, **kwargs)
             else:
                 # TODO tune output size (n_hidden)
+                # TODO write transformer function in order to use the post_transformer layer as input to the AC
                 pre_transformer_latent = linear(self.processed_obs, 'pre-trans', n_hidden=32)
-                pi_latent, vf_latent = mlp_extractor(tf.layers.flatten(pre_transformer_latent), net_arch, act_fun)
+                # pi_latent, vf_latent = mlp_extractor(tf.layers.flatten(pre_transformer_latent), net_arch, act_fun)
+                post_transformer_latent = tf.squeeze(transformer(pre_transformer_latent, transformer_depth=2))
+                pi_latent, vf_latent = mlp_extractor(tf.layers.flatten(post_transformer_latent), net_arch, act_fun)
 
             self._value_fn = linear(vf_latent, 'vf', 1)
             self._pre_transformer_latent = pre_transformer_latent

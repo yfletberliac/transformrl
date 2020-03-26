@@ -90,6 +90,7 @@ class PPO2(ActorCriticRLModel):
         self.clip_range_ph = None
         self.entropy = None
         self.transformer_loss = None
+        self.explained_variance = None
         self.vf_loss = None
         self.pg_loss = None
         self.approxkl = None
