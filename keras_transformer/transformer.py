@@ -6,6 +6,7 @@ Contains implementation of the Transformer model described in papers
 import math
 from typing import Union, Callable, Optional
 
+import tensorflow as tf
 from keras.layers import Layer, Add, Dropout
 from keras import initializers, activations
 # noinspection PyPep8Naming
@@ -117,9 +118,7 @@ class TransformerTransition(Layer):
         return super().build(input_shape)
 
     def call(self, inputs, **kwargs):
-        input_shape = K.int_shape(inputs)
-        # TODO remove this other quick-fix ↓
-        input_shape = (int(2048/32), input_shape[-1])
+        input_shape = inputs.shape
         d_model = input_shape[-1]
         step1 = self.activation(
             K.bias_add(
@@ -131,7 +130,7 @@ class TransformerTransition(Layer):
             K.dot(step1, self.weights2),
             self.biases2,
             data_format='channels_last')
-        result = K.reshape(step2, (-1,) + input_shape[-2:])
+        result = K.reshape(step2, (1, ) + input_shape[-2:])
         return result
 
 

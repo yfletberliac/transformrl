@@ -211,7 +211,7 @@ class _BaseMultiHeadAttention(Layer):
             np.tril(np.ones(last_dims))
             # to ensure proper broadcasting
             .reshape((1,) + last_dims))
-        low_triangle_ones = np.random.choice([0, 1], size=last_dims, p=[7. / 10, 3. / 10]).reshape((1,) + last_dims)
+        low_triangle_ones = np.random.choice([0, 1], size=last_dims, p=[1. / 10, 9. / 10]).reshape((1,) + last_dims)
         inverse_low_triangle = 1 - low_triangle_ones
         close_to_negative_inf = -1e9
         result = (
@@ -312,9 +312,9 @@ class MultiHeadSelfAttention(_BaseMultiHeadAttention):
         if not K.is_tensor(inputs):
             raise ValueError(
                 'The layer can be called only with one tensor as an argument')
-        seq_len, d_model = K.int_shape(inputs)
-        # TODO remove this other quick-fix ↓
-        seq_len = int(2048 / 32)  # nsteps / nminibatches
+        input_shape = inputs.shape
+        inputs = K.reshape(inputs, (1,) + input_shape[-2:])
+        _, seq_len, d_model = inputs.shape
         # The first thing we need to do is to perform affine transformations
         # of the inputs to get the Queries, the Keys and the Values.
         qkv = K.dot(K.reshape(inputs, [-1, d_model]), self.qkv_weights)

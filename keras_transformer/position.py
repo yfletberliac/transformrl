@@ -112,7 +112,8 @@ class TransformerCoordinateEmbedding(Layer):
             shape=(sequence_length, d_model),
             initializer='uniform',
             name='word_position_embeddings',
-            trainable=True)
+            trainable=True,
+            dtype=None)
         self.depth_embeddings = self.add_weight(
             shape=(self.max_depth, d_model),
             initializer='uniform',

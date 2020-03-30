@@ -99,7 +99,7 @@ def transformer(flat_observations, transformer_depth):
         use_masking=True)
 
     add_coordinate_embedding = TransformerCoordinateEmbedding(
-        transformer_depth,
+        max_transformer_depth=transformer_depth,
         name='coordinate_embedding')
 
     output = flat_observations  # shape: (<batch size>, <input size>)
@@ -134,7 +134,7 @@ class BasePolicy(ABC):
         self.n_env = n_env
         self.n_steps = n_steps
         self.n_batch = n_batch
-        with tf.variable_scope("input", reuse=False):
+        with tf.compat.v1.variable_scope("input", reuse=False):
             if obs_phs is None:
                 self._obs_ph, self._processed_obs = observation_input(ob_space, n_batch, scale=scale)
             else:
@@ -245,13 +245,13 @@ class ActorCriticPolicy(BasePolicy):
         self._policy = None
         self._proba_distribution = None
         self._value_fn = None
-        self._pre_transformer_latent = None
+        self._post_transformer_latent = None
         self._action = None
         self._deterministic_action = None
 
     def _setup_init(self):
         """Sets up the distributions, actions, and value."""
-        with tf.variable_scope("output", reuse=True):
+        with tf.compat.v1.variable_scope("output", reuse=True):
             assert self.policy is not None and self.proba_distribution is not None and self.value_fn is not None
             self._action = self.proba_distribution.sample()
             self._deterministic_action = self.proba_distribution.mode()
@@ -268,7 +268,7 @@ class ActorCriticPolicy(BasePolicy):
             else:
                 self._policy_proba = []  # it will return nothing, as it is not implemented
             self._value_flat = self.value_fn[:, 0]
-            self._pre_transformer_latent_flat = self.pre_transformer_latent[:]
+            self._post_transformer_latent_flat = self.post_transformer_latent[:]
 
     @property
     def pdtype(self):
@@ -291,9 +291,9 @@ class ActorCriticPolicy(BasePolicy):
         return self._value_fn
 
     @property
-    def pre_transformer_latent(self):
+    def post_transformer_latent(self):
         """tf.Tensor: transformer estimate, of shape (self.n_batch, 1, ob_space)"""
-        return self._pre_transformer_latent
+        return self._post_transformer_latent
 
     @property
     def value_flat(self):
@@ -301,9 +301,9 @@ class ActorCriticPolicy(BasePolicy):
         return self._value_flat
 
     @property
-    def pre_transformer_latent_flat(self):
+    def post_transformer_latent_flat(self):
         """tf.Tensor: value estimate, of shape (self.n_batch, ob_space)"""
-        return self._pre_transformer_latent_flat
+        return self._post_transformer_latent_flat
 
     @property
     def action(self):
@@ -375,7 +375,7 @@ class RecurrentActorCriticPolicy(ActorCriticPolicy):
         super(RecurrentActorCriticPolicy, self).__init__(sess, ob_space, ac_space, n_env, n_steps,
                                                          n_batch, reuse=reuse, scale=scale)
 
-        with tf.variable_scope("input", reuse=False):
+        with tf.compat.v1.variable_scope("input", reuse=False):
             self._dones_ph = tf.placeholder(tf.float32, (n_batch,), name="dones_ph")  # (done t-1)
             state_ph_shape = (self.n_env,) + tuple(state_shape)
             self._states_ph = tf.placeholder(tf.float32, state_ph_shape, name="states_ph")
@@ -446,7 +446,7 @@ class LstmPolicy(RecurrentActorCriticPolicy):
             else:
                 warnings.warn("The layers parameter is deprecated. Use the net_arch parameter instead.")
 
-            with tf.variable_scope("model", reuse=reuse):
+            with tf.compat.v1.variable_scope("model", reuse=reuse):
                 if feature_extraction == "cnn":
                     extracted_features = cnn_extractor(self.processed_obs, **kwargs)
                 else:
@@ -471,7 +471,7 @@ class LstmPolicy(RecurrentActorCriticPolicy):
             if feature_extraction == "cnn":
                 raise NotImplementedError()
 
-            with tf.variable_scope("model", reuse=reuse):
+            with tf.compat.v1.variable_scope("model", reuse=reuse):
                 latent = tf.layers.flatten(self.processed_obs)
                 policy_only_layers = []  # Layer sizes of the network that only belongs to the policy network
                 value_only_layers = []  # Layer sizes of the network that only belongs to the value network
@@ -583,22 +583,21 @@ class FeedForwardPolicy(ActorCriticPolicy):
 
         if net_arch is None:
             if layers is None:
-                layers = [64, 64]
+                # TODO check number/size of needed layers
+                layers = [32]
             net_arch = [dict(vf=layers, pi=layers)]
 
-        with tf.variable_scope("model", reuse=reuse):
+        with tf.compat.v1.variable_scope("model", reuse=reuse):
             if feature_extraction == "cnn":
                 pi_latent = vf_latent = cnn_extractor(self.processed_obs, **kwargs)
             else:
                 # TODO tune output size (n_hidden)
-                # TODO write transformer function in order to use the post_transformer layer as input to the AC
-                pre_transformer_latent = linear(self.processed_obs, 'pre-trans', n_hidden=32)
-                # pi_latent, vf_latent = mlp_extractor(tf.layers.flatten(pre_transformer_latent), net_arch, act_fun)
+                pre_transformer_latent = linear(self.processed_obs, 'pre-trans', n_hidden=64)
                 post_transformer_latent = tf.squeeze(transformer(pre_transformer_latent, transformer_depth=2))
-                pi_latent, vf_latent = mlp_extractor(tf.layers.flatten(post_transformer_latent), net_arch, act_fun)
+                pi_latent, vf_latent = mlp_extractor(post_transformer_latent, net_arch, act_fun)
 
-            self._value_fn = linear(vf_latent, 'vf', 1)
-            self._pre_transformer_latent = pre_transformer_latent
+            self._value_fn = linear(vf_latent, 'pre-vf', 1)
+            self._post_transformer_latent = linear(post_transformer_latent, 'post-trans', n_hidden=ob_space.shape[0])
 
             self._proba_distribution, self._policy, self.q_value = \
                 self.pdtype.proba_distribution_from_latent(pi_latent, vf_latent, init_scale=0.01)
@@ -612,13 +611,14 @@ class FeedForwardPolicy(ActorCriticPolicy):
         else:
             action, value, neglogp = self.sess.run([self.action, self.value_flat, self.neglogp],
                                                    {self.obs_ph: obs})
-        return action, value, self.initial_state, neglogp
+        return np.expand_dims(action[0], axis=0), np.expand_dims(value[0], axis=0), self.initial_state,\
+               np.expand_dims(neglogp[0], axis=0)
 
     def proba_step(self, obs, state=None, mask=None):
         return self.sess.run(self.policy_proba, {self.obs_ph: obs})
 
     def value(self, obs, state=None, mask=None):
-        return self.sess.run(self.value_flat, {self.obs_ph: obs})
+        return np.expand_dims(self.sess.run(self.value_flat, {self.obs_ph: obs})[0], axis=0)
 
 
 class CnnPolicy(FeedForwardPolicy):

@@ -141,7 +141,7 @@ class ProbabilityDistributionType(object):
         :param name: (str) the placeholder name
         :return: (TensorFlow Tensor) the placeholder
         """
-        return tf.placeholder(dtype=tf.float32, shape=prepend_shape + self.param_shape(), name=name)
+        return tf.compat.v1.placeholder(dtype=tf.float32, shape=prepend_shape + self.param_shape(), name=name)
 
     def sample_placeholder(self, prepend_shape, name=None):
         """
@@ -151,7 +151,7 @@ class ProbabilityDistributionType(object):
         :param name: (str) the placeholder name
         :return: (TensorFlow Tensor) the placeholder
         """
-        return tf.placeholder(dtype=self.sample_dtype(), shape=prepend_shape + self.sample_shape(), name=name)
+        return tf.compat.v1.placeholder(dtype=self.sample_dtype(), shape=prepend_shape + self.sample_shape(), name=name)
 
 
 class CategoricalProbabilityDistributionType(ProbabilityDistributionType):
@@ -237,7 +237,7 @@ class DiagGaussianProbabilityDistributionType(ProbabilityDistributionType):
 
     def proba_distribution_from_latent(self, pi_latent_vector, vf_latent_vector, init_scale=1.0, init_bias=0.0):
         mean = linear(pi_latent_vector, 'pi', self.size, init_scale=init_scale, init_bias=init_bias)
-        logstd = tf.get_variable(name='pi/logstd', shape=[1, self.size], initializer=tf.zeros_initializer())
+        logstd = tf.compat.v1.get_variable(name='pi/logstd', shape=[1, self.size], initializer=tf.zeros_initializer())
         pdparam = tf.concat([mean, mean * 0.0 + logstd], axis=1)
         q_values = linear(vf_latent_vector, 'q', self.size, init_scale=init_scale, init_bias=init_bias)
         return self.proba_distribution_from_flat(pdparam), mean, q_values
@@ -415,7 +415,7 @@ class DiagGaussianProbabilityDistribution(ProbabilityDistribution):
     def sample(self):
         # Bounds are taken into acount outside this class (during training only)
         # Otherwise, it changes the distribution and breaks PPO2 for instance
-        return self.mean + self.std * tf.random_normal(tf.shape(self.mean),
+        return self.mean + self.std * tf.compat.v1.random_normal(tf.shape(self.mean),
                                                        dtype=self.mean.dtype)
 
     @classmethod
