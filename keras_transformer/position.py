@@ -94,7 +94,9 @@ class TransformerCoordinateEmbedding(Layer):
     with those embeddings added.
     """
 
-    def __init__(self, max_transformer_depth: int, **kwargs):
+    def __init__(self, n_steps, batch_size, max_transformer_depth: int, **kwargs):
+        self.n_steps = n_steps
+        self.batch_size = batch_size
         self.max_depth = max_transformer_depth
         super().__init__(**kwargs)
 
@@ -106,8 +108,7 @@ class TransformerCoordinateEmbedding(Layer):
     # noinspection PyAttributeOutsideInit
     def build(self, input_shape):
         sequence_length, d_model = input_shape[-2:]
-        # TODO remove this quick-fix ↓
-        sequence_length = int(2048 / 32)  # nsteps / nminibatches
+        sequence_length = int(self.n_steps / self.batch_size)
         self.word_position_embeddings = self.add_weight(
             shape=(sequence_length, d_model),
             initializer='uniform',

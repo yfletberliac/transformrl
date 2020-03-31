@@ -90,7 +90,7 @@ def mlp_extractor(flat_observations, net_arch, act_fun):
     return latent_policy, latent_value
 
 
-def transformer(flat_observations, transformer_depth):
+def transformer(flat_observations, n_steps, batch_size, transformer_depth):
     transformer_block = TransformerBlock(
         name='transformer',
         num_heads=8,
@@ -99,6 +99,8 @@ def transformer(flat_observations, transformer_depth):
         use_masking=True)
 
     add_coordinate_embedding = TransformerCoordinateEmbedding(
+        n_steps,
+        batch_size,
         max_transformer_depth=transformer_depth,
         name='coordinate_embedding')
 
@@ -593,7 +595,10 @@ class FeedForwardPolicy(ActorCriticPolicy):
             else:
                 # TODO tune output size (n_hidden)
                 pre_transformer_latent = linear(self.processed_obs, 'pre-trans', n_hidden=64)
-                post_transformer_latent = tf.squeeze(transformer(pre_transformer_latent, transformer_depth=2))
+                post_transformer_latent = tf.squeeze(transformer(pre_transformer_latent,
+                                                                 n_steps=self.n_steps,
+                                                                 batch_size=self.n_batch,
+                                                                 transformer_depth=2))
                 pi_latent, vf_latent = mlp_extractor(post_transformer_latent, net_arch, act_fun)
 
             self._value_fn = linear(vf_latent, 'pre-vf', 1)
@@ -611,7 +616,7 @@ class FeedForwardPolicy(ActorCriticPolicy):
         else:
             action, value, neglogp = self.sess.run([self.action, self.value_flat, self.neglogp],
                                                    {self.obs_ph: obs})
-        return np.expand_dims(action[0], axis=0), np.expand_dims(value[0], axis=0), self.initial_state,\
+        return np.expand_dims(action[0], axis=0), np.expand_dims(value[0], axis=0), self.initial_state, \
                np.expand_dims(neglogp[0], axis=0)
 
     def proba_step(self, obs, state=None, mask=None):
