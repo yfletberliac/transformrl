@@ -626,14 +626,13 @@ class FeedForwardPolicy(ActorCriticPolicy):
         else:
             action, value, neglogp = self.sess.run([self.action, self.value_flat, self.neglogp],
                                                    {self.obs_ph: obs})
-        return np.expand_dims(action[0], axis=0), np.expand_dims(value[0], axis=0), self.initial_state, \
-               np.expand_dims(neglogp[0], axis=0)
+        return action, value, self.initial_state, neglogp
 
     def proba_step(self, obs, state=None, mask=None):
         return self.sess.run(self.policy_proba, {self.obs_ph: obs})
 
     def value(self, obs, state=None, mask=None):
-        return np.expand_dims(self.sess.run(self.value_flat, {self.obs_ph: obs})[0], axis=0)
+        return self.sess.run(self.value_flat, {self.obs_ph: obs})
 
 
 class CnnPolicy(FeedForwardPolicy):
