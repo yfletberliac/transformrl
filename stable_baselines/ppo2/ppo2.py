@@ -200,7 +200,9 @@ class PPO2(ActorCriticRLModel):
                     self.clipfrac = tf.reduce_mean(tf.cast(tf.greater(tf.abs(ratio - 1.0),
                                                                       self.clip_range_ph), tf.float32))
 
-                    self.transformer_loss = tf.reduce_mean(tf.square(obspred - train_model.obs_ph))
+                    projection = linear(obspred, 'projection',
+                                        n_hidden=train_model.obs_ph.shape[1])
+                    self.transformer_loss = tf.reduce_mean(tf.square(projection - train_model.obs_ph))
 
                     loss = self.pg_loss + self.vf_loss * self.vf_coef + self.transformer_loss * self.transformer_coef
 
@@ -299,7 +301,7 @@ class PPO2(ActorCriticRLModel):
             update_fac = self.n_batch // self.nminibatches // self.noptepochs + 1
         else:
             update_fac = self.n_batch // self.nminibatches // self.noptepochs // self.n_steps + 1
-        if writer is not None and (1 + update) % 10 == 0:
+        if writer is not None and (1 + update) % 100 == 0:
             # run loss backprop with summary, but once every 10 runs save the metadata (memory, compute time, ...)
             if self.full_tensorboard_log and (1 + update) % 10 == 0:
                 run_options = tf.RunOptions(trace_level=tf.RunOptions.FULL_TRACE)

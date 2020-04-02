@@ -12,6 +12,8 @@ from stable_baselines.common.input import observation_input
 from stable_baselines.utils import conv, linear, conv_to_fc, batch_to_seq, seq_to_batch, lstm
 from keras_transformer.transformer import *
 from keras_transformer.position import *
+from keras_transformer.extras import *
+from keras import regularizers
 
 
 def nature_cnn(scaled_images, **kwargs):
@@ -90,17 +92,18 @@ def mlp_extractor(flat_observations, net_arch, act_fun):
     return latent_policy, latent_value
 
 
-def transformer(flat_observations, n_steps, batch_size, transformer_depth):
+def transformer(flat_observations, n_steps, batch_size, num_heads, transformer_depth):
     transformer_block = TransformerBlock(
         name='transformer',
-        num_heads=8,
+        num_heads=num_heads,
         residual_dropout=0.1,
         attention_dropout=0.1,
-        use_masking=True)
+        use_masking=True,
+        masking_ratio=0.3)
 
     add_coordinate_embedding = TransformerCoordinateEmbedding(
-        n_steps,
-        batch_size,
+        n_steps=n_steps,
+        batch_size=batch_size,
         max_transformer_depth=transformer_depth,
         name='coordinate_embedding')
 
@@ -596,13 +599,20 @@ class FeedForwardPolicy(ActorCriticPolicy):
                 # TODO tune output size (n_hidden)
                 pre_transformer_latent = linear(self.processed_obs, 'pre-trans', n_hidden=64)
                 post_transformer_latent = tf.squeeze(transformer(pre_transformer_latent,
-                                                                 n_steps=self.n_steps,
-                                                                 batch_size=self.n_batch,
+                                                                 n_steps=2048,
+                                                                 batch_size=32,
+                                                                 num_heads=2,
                                                                  transformer_depth=2))
-                pi_latent, vf_latent = mlp_extractor(post_transformer_latent, net_arch, act_fun)
+
+                post_transformer_shape = self.processed_obs.shape[1]+post_transformer_latent.shape[0]*post_transformer_latent.shape[1]
+
+                pre_agent_latent = K.reshape(K.concatenate([tf.expand_dims(K.flatten(self.processed_obs[0]), axis=0),
+                                                         tf.expand_dims(K.flatten(post_transformer_latent), axis=0)], axis=-1),
+                                                    (1, post_transformer_shape))
+                pi_latent, vf_latent = mlp_extractor(pre_agent_latent, net_arch, act_fun)
 
             self._value_fn = linear(vf_latent, 'pre-vf', 1)
-            self._post_transformer_latent = linear(post_transformer_latent, 'post-trans', n_hidden=ob_space.shape[0])
+            self._post_transformer_latent = post_transformer_latent
 
             self._proba_distribution, self._policy, self.q_value = \
                 self.pdtype.proba_distribution_from_latent(pi_latent, vf_latent, init_scale=0.01)

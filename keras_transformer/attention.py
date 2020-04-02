@@ -14,6 +14,8 @@ class _BaseMultiHeadAttention(Layer):
     def __init__(self, num_heads: int, use_masking: bool,
                  dropout: float = 0.0,
                  compression_window_size: int = None,
+                 n_steps: int = 2048, batch_size: int = 32,
+                 masking_ratio: float = 0.3,
                  **kwargs):
         """
         :param num_heads: number of attention heads
@@ -33,6 +35,9 @@ class _BaseMultiHeadAttention(Layer):
         self.num_heads = num_heads
         self.use_masking = use_masking
         self.dropout = dropout
+        self.n_steps = n_steps
+        self.batch_size = batch_size
+        self.masking_ratio = masking_ratio
         if (compression_window_size is not None
                 and compression_window_size <= 0):
             assert ValueError(
@@ -205,13 +210,13 @@ class _BaseMultiHeadAttention(Layer):
         """
         if not self.use_masking:
             return dot_product
-        last_dims = K.int_shape(dot_product)[-2:]
-        # TODO set ratio as arg
-        low_triangle_ones = (
-            np.tril(np.ones(last_dims))
-            # to ensure proper broadcasting
-            .reshape((1,) + last_dims))
-        low_triangle_ones = np.random.choice([0, 1], size=last_dims, p=[1. / 10, 9. / 10]).reshape((1,) + last_dims)
+        last_dims = (int(self.n_steps / self.batch_size), int(self.n_steps / self.batch_size))
+        # low_triangle_ones = (
+        #     np.tril(np.ones(last_dims))
+        #     # to ensure proper broadcasting
+        #     .reshape((1,) + last_dims))
+        ratio = self.masking_ratio
+        low_triangle_ones = np.random.choice([0, 1], size=last_dims, p=[ratio, 1 - ratio]).reshape((1,) + last_dims)
         inverse_low_triangle = 1 - low_triangle_ones
         close_to_negative_inf = -1e9
         result = (

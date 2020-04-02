@@ -172,11 +172,12 @@ class TransformerBlock:
                  activation: Optional[Union[str, Callable]] = 'gelu',
                  compression_window_size: int = None,
                  use_masking: bool = True,
-                 vanilla_wiring=False):
+                 vanilla_wiring=False,
+                 masking_ratio: float = 0):
         self.attention_layer = MultiHeadSelfAttention(
             num_heads, use_masking=use_masking, dropout=attention_dropout,
             compression_window_size=compression_window_size,
-            name=f'{name}_self_attention')
+            name=f'{name}_self_attention', masking_ratio=masking_ratio)
         self.norm1_layer = LayerNormalization(name=f'{name}_normalization1')
         self.dropout_layer = (
             Dropout(residual_dropout, name=f'{name}_dropout')
