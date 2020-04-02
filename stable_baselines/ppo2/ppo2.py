@@ -8,12 +8,11 @@ import tensorflow as tf
 tf.compat.v1.disable_eager_execution()
 
 from stable_baselines import logger
-from stable_baselines.common import explained_variance_tensor, variance_tensor, explained_variance, ActorCriticRLModel, \
+from stable_baselines.common import explained_variance_tensor, explained_variance, ActorCriticRLModel, \
     tf_util, SetVerbosity, TensorboardWriter
 from stable_baselines.common.policies import ActorCriticPolicy, RecurrentActorCriticPolicy
 from stable_baselines.common.runners import AbstractEnvRunner
 from stable_baselines.utils import total_episode_reward_logger, linear
-from stable_baselines.common.tf_util import huber_loss
 from keras_transformer.transformer import *
 from keras_transformer.position import *
 
@@ -202,9 +201,9 @@ class PPO2(ActorCriticRLModel):
 
                     projection = linear(obspred, 'projection',
                                         n_hidden=train_model.obs_ph.shape[1])
-                    self.transformer_loss = tf.reduce_mean(tf.square(projection - train_model.obs_ph))
+                    self.transformer_loss = .5 * tf.reduce_mean(tf.square(projection - train_model.obs_ph))
 
-                    loss = self.pg_loss + self.vf_loss * self.vf_coef + self.transformer_loss * self.transformer_coef
+                    loss = self.pg_loss + self.vf_loss * self.vf_coef - self.transformer_loss * self.transformer_coef
 
                     tf.compat.v1.summary.scalar('entropy_loss', self.entropy)
                     tf.compat.v1.summary.scalar('policy_gradient_loss', self.pg_loss)

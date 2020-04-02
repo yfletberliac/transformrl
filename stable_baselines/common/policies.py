@@ -96,9 +96,9 @@ def transformer(flat_observations, n_steps, batch_size, num_heads, transformer_d
     transformer_block = TransformerBlock(
         name='transformer',
         num_heads=num_heads,
-        residual_dropout=0.1,
-        attention_dropout=0.1,
-        use_masking=True,
+        residual_dropout=0.,
+        attention_dropout=0.,
+        use_masking=False,
         masking_ratio=0.3)
 
     add_coordinate_embedding = TransformerCoordinateEmbedding(
@@ -588,31 +588,30 @@ class FeedForwardPolicy(ActorCriticPolicy):
 
         if net_arch is None:
             if layers is None:
-                # TODO check number/size of needed layers
-                layers = [32]
+                layers = [64, 64]
             net_arch = [dict(vf=layers, pi=layers)]
 
         with tf.compat.v1.variable_scope("model", reuse=reuse):
             if feature_extraction == "cnn":
                 pi_latent = vf_latent = cnn_extractor(self.processed_obs, **kwargs)
             else:
-                # TODO tune output size (n_hidden)
                 pre_transformer_latent = linear(self.processed_obs, 'pre-trans', n_hidden=64)
-                post_transformer_latent = tf.squeeze(transformer(pre_transformer_latent,
-                                                                 n_steps=2048,
-                                                                 batch_size=32,
-                                                                 num_heads=2,
-                                                                 transformer_depth=2))
+                post_transformer_latent = tf.reduce_sum(tf.squeeze(transformer(pre_transformer_latent,
+                                                                               n_steps=2048,
+                                                                               batch_size=32,
+                                                                               num_heads=8,
+                                                                               transformer_depth=2)), axis=1)
 
-                post_transformer_shape = self.processed_obs.shape[1]+post_transformer_latent.shape[0]*post_transformer_latent.shape[1]
+                post_transformer_shape = self.processed_obs.shape[1] + post_transformer_latent.shape[0]
+                pre_agent = K.reshape(K.concatenate([tf.expand_dims(K.flatten(self.processed_obs[0]), axis=0),
+                                                     tf.expand_dims(post_transformer_latent, axis=0)], axis=-1),
+                                      (1, post_transformer_shape))
+                pi_latent, vf_latent = mlp_extractor(pre_agent, net_arch, act_fun)
 
-                pre_agent_latent = K.reshape(K.concatenate([tf.expand_dims(K.flatten(self.processed_obs[0]), axis=0),
-                                                         tf.expand_dims(K.flatten(post_transformer_latent), axis=0)], axis=-1),
-                                                    (1, post_transformer_shape))
-                pi_latent, vf_latent = mlp_extractor(pre_agent_latent, net_arch, act_fun)
-
-            self._value_fn = linear(vf_latent, 'pre-vf', 1)
-            self._post_transformer_latent = post_transformer_latent
+            self._value_fn = linear(vf_latent, 'vf', 1)
+            self._post_transformer_latent = self.processed_obs * linear(tf.expand_dims(post_transformer_latent, axis=0),
+                                                                        "pre-trans-loss",
+                                                                        self.processed_obs.shape[1])
 
             self._proba_distribution, self._policy, self.q_value = \
                 self.pdtype.proba_distribution_from_latent(pi_latent, vf_latent, init_scale=0.01)

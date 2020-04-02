@@ -211,12 +211,12 @@ class _BaseMultiHeadAttention(Layer):
         if not self.use_masking:
             return dot_product
         last_dims = (int(self.n_steps / self.batch_size), int(self.n_steps / self.batch_size))
-        # low_triangle_ones = (
-        #     np.tril(np.ones(last_dims))
-        #     # to ensure proper broadcasting
-        #     .reshape((1,) + last_dims))
+        low_triangle_ones = (
+            np.tril(np.ones(last_dims))
+            # to ensure proper broadcasting
+            .reshape((1,) + last_dims))
         ratio = self.masking_ratio
-        low_triangle_ones = np.random.choice([0, 1], size=last_dims, p=[ratio, 1 - ratio]).reshape((1,) + last_dims)
+        # low_triangle_ones = np.random.choice([0, 1], size=last_dims, p=[ratio, 1 - ratio]).reshape((1,) + last_dims)
         inverse_low_triangle = 1 - low_triangle_ones
         close_to_negative_inf = -1e9
         result = (
