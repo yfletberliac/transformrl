@@ -588,25 +588,28 @@ class FeedForwardPolicy(ActorCriticPolicy):
 
         if net_arch is None:
             if layers is None:
-                layers = [64, 64]
+                layers = [128, 128]
             net_arch = [dict(vf=layers, pi=layers)]
 
         with tf.compat.v1.variable_scope("model", reuse=reuse):
             if feature_extraction == "cnn":
                 pi_latent = vf_latent = cnn_extractor(self.processed_obs, **kwargs)
             else:
-                pre_transformer_latent = linear(self.processed_obs, 'pre-trans', n_hidden=64)
+                pre_transformer_latent = linear(self.processed_obs, 'pre-trans', n_hidden=256)
                 post_transformer_latent = tf.reduce_sum(tf.squeeze(transformer(pre_transformer_latent,
                                                                                n_steps=2048,
                                                                                batch_size=32,
                                                                                num_heads=8,
                                                                                transformer_depth=2)), axis=1)
 
-                post_transformer_shape = self.processed_obs.shape[1] + post_transformer_latent.shape[0]
-                pre_agent = K.reshape(K.concatenate([tf.expand_dims(K.flatten(self.processed_obs[0]), axis=0),
-                                                     tf.expand_dims(post_transformer_latent, axis=0)], axis=-1),
-                                      (1, post_transformer_shape))
-                pi_latent, vf_latent = mlp_extractor(pre_agent, net_arch, act_fun)
+                # post_transformer_shape = self.processed_obs.shape[1] + post_transformer_latent.shape[0]
+                # pre_agent = K.reshape(K.concatenate([tf.expand_dims(K.flatten(self.processed_obs), axis=0),
+                #                                      tf.expand_dims(post_transformer_latent, axis=0)], axis=1),
+                #                       (1, post_transformer_shape))
+                # pre_agent = self.processed_obs * linear(tf.expand_dims(post_transformer_latent, axis=0),
+                #                                         "pre-agent",
+                #                                         self.processed_obs.shape[1])
+                pi_latent, vf_latent = mlp_extractor(pre_transformer_latent, net_arch, act_fun)
 
             self._value_fn = linear(vf_latent, 'vf', 1)
             self._post_transformer_latent = self.processed_obs * linear(tf.expand_dims(post_transformer_latent, axis=0),
