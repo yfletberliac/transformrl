@@ -13,6 +13,7 @@ from stable_baselines.common import explained_variance_tensor, explained_varianc
 from stable_baselines.common.policies import ActorCriticPolicy, RecurrentActorCriticPolicy
 from stable_baselines.common.runners import AbstractEnvRunner
 from stable_baselines.utils import total_episode_reward_logger, linear
+from stable_baselines.common.tf_util import huber_loss
 from keras_transformer.transformer import *
 from keras_transformer.position import *
 
@@ -200,7 +201,7 @@ class PPO2(ActorCriticRLModel):
                                                                       self.clip_range_ph), tf.float32))
 
                     projection = obspred
-                    self.transformer_loss = .5 * tf.reduce_mean(tf.square(projection - train_model.obs_ph))
+                    self.transformer_loss = .5 * tf.reduce_mean(huber_loss(projection - train_model.obs_ph))
 
                     loss = self.pg_loss + self.vf_loss * self.vf_coef + self.transformer_loss * self.transformer_coef
 

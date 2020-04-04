@@ -588,14 +588,14 @@ class FeedForwardPolicy(ActorCriticPolicy):
 
         if net_arch is None:
             if layers is None:
-                layers = [128, 128]
+                layers = [64, 64]
             net_arch = [dict(vf=layers, pi=layers)]
 
         with tf.compat.v1.variable_scope("model", reuse=reuse):
             if feature_extraction == "cnn":
                 pi_latent = vf_latent = cnn_extractor(self.processed_obs, **kwargs)
             else:
-                pre_transformer_latent = linear(self.processed_obs, 'pre-trans', n_hidden=256)
+                pre_transformer_latent = linear(self.processed_obs, 'pre-trans', n_hidden=16)
                 post_transformer_latent = tf.reduce_sum(tf.squeeze(transformer(pre_transformer_latent,
                                                                                n_steps=2048,
                                                                                batch_size=32,
